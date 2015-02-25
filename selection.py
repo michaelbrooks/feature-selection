@@ -1,10 +1,8 @@
 from sklearn.cross_validation import KFold
-from sklearn import svm
 from sklearn.feature_selection import SelectKBest, VarianceThreshold
 from sklearn.base import BaseEstimator
 from sklearn.feature_selection.base import SelectorMixin
 from sklearn.feature_selection import chi2 as metric_chi2
-from sklearn.pipeline import Pipeline
 import numpy as np
 
 class FeatureSelectionPipeline(BaseEstimator, SelectorMixin):
@@ -82,7 +80,8 @@ def quick_eval(X, y):
     print "Average accuracy over %d folds: %.1f%%" % (denom, 100 * acc / denom)
 
 def train_test_eval(X_train, y_train, X_test, y_test):
-    clf = svm.SVC(kernel='linear', C=1).fit(X_train, y_train)
+    from sklearn import linear_model
+    clf = linear_model.LogisticRegression(C=1).fit(X_train, y_train)
     return clf.score(X_test, y_test)
 
 def print_selected(names, selected):
