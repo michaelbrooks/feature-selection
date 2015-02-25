@@ -15,7 +15,10 @@ def load_vocab(path_to_dataset):
     path_to_dataset = path(path_to_dataset)
 
     with open(path_to_dataset / 'Vocab.csv', 'rb') as vocab:
-        return vocab.readlines()
+        words = vocab.readlines()
+        for i, word in enumerate(words):
+            words[i] = word.strip()
+        return words
 
 
 def load_labels(path_to_dataset):
