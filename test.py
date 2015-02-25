@@ -19,4 +19,4 @@ select_and_eval(features, dataset.data, dataset.target, metric_random, 2)
 
 print
 print "Loading a test dataset"
-test_data, test_data_vocab = load_dataset('test_data')
+test_data = load_dataset('test_data')

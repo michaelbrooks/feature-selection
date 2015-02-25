@@ -52,7 +52,7 @@ Dataset Input Format
 
 Feature selection requires as input information about a collection
 of labeled documents that have been converted into bag-of-words term vectors.
-Information about these documents should be provided in three files together in one folder.
+Information about these documents should be provided in four files together in one folder.
 See the `test_data` folder for an example.
 
 The `Vocab.csv` file is the bag of words vocabulary, a list of the terms from across the documents.
@@ -67,7 +67,11 @@ DocId, Label, IsInTrainingSet, IsInValidationSet, IsInTestSet
 24, 1, False, False, True
 ```
 
-The `Indices.csv` file encodes what terms exist in which documents.
-The rows in this file have variable length, but the first column is
-the document id. The remaining columns are numbers that refer to indices
-in the vocabulary.
+The `Indices.csv` and `Values.csv` files together encodes what features (vocab words)
+exist in which documents, and what their values are.
+
+> The indices refer to words in the vocabulary, but these are expected to be **1-indexed**.
+
+The rows in these two files have variable length, but the first column in each case is the document id.
+The document ids should match row for row between `Indices.csv` and `Values.csv`,
+and the lengths of the rows should also match.

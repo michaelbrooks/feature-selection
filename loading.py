@@ -38,7 +38,7 @@ def load_labels(path_to_dataset):
 
 
 def load_indices(path_to_dataset):
-    """Returns tuples of document ids and bow vectors (0-indexed)"""
+    """Returns tuples of document ids and sparse bow indices (0-indexed)"""
     path_to_dataset = path(path_to_dataset)
 
     with open(path_to_dataset / 'Indices.csv', 'rb') as indices:
@@ -50,6 +50,19 @@ def load_indices(path_to_dataset):
             yield (docId, bow)
 
 
+def load_values(path_to_dataset):
+    """Returns tuples of document ids and sparse vow values"""
+    path_to_dataset = path(path_to_dataset)
+
+    with open(path_to_dataset / 'Values.csv', 'rb') as values:
+        reader = csv.reader(values)
+        for row in reader:
+            # First col is id, rest are values, floats
+            docId = int(row[0])
+            bow = [float(val) for val in row[1:]]
+            yield (docId, bow)
+
+
 class Document(object):
     def __init__(self, id, label, is_train=True, is_validation=False, is_test=False):
         self.id = id
@@ -57,14 +70,23 @@ class Document(object):
         self.is_train = is_train
         self.is_validation = is_validation
         self.is_test = is_test
-        self.bow = None
+        self.bow_indices = None
+        self.bow_values = None
 
-    def set_bow(self, bow):
-        self.bow = bow
+    def set_bow(self, indices, values):
+        """Indices and values, i.e. a sparse feature vector"""
+        self.bow_indices = indices
+        self.bow_values = values
+
 
 def load_dataset(path_to_folder):
-    """Returns a tuple of a collection of `Document` objects and a vocab list."""
+    """
+    Returns a tuple of three sklearn dataset objects, containing
+    feature_names, data, and target.
     
+    The first is for training, the second is for validation, and the third is test data.
+    """
+
     root = path(path_to_folder)
 
     print "Loading dataset %s" % path_to_folder
@@ -72,6 +94,7 @@ def load_dataset(path_to_folder):
     vocab = load_vocab(root)
     labels = load_labels(root)
     indices = load_indices(root)
+    values = load_values(root)
 
     # Combine into documents
     docs_by_id = {}
@@ -92,28 +115,77 @@ def load_dataset(path_to_folder):
 
         docs_by_id[doc.id] = doc
 
-    # Add the indices
-    for id, bow in indices:
+    # Add the indices and values
+    for indices_row, values_row in zip(indices, values):
+        indices_id, bow_indices = indices_row
+        values_id, bow_values = values_row
+
+        if indices_id != values_id:
+            raise ValueError("Documents %d in indices and %d in values are mismatched rows" % (indices_id, values_id))
+
+        id = indices_id
+
+        if len(bow_indices) != len(bow_values):
+            raise ValueError("Document %d has different indices and values lengths" % id)
+
         if id not in docs_by_id:
             raise ValueError("Document %d from indices file not in labels file" % id)
 
-        if max(bow) >= len(vocab):
+        if max(bow_indices) >= len(vocab):
             raise ValueError(
                 "Document %d has max term index of %d and vocab only has %d words" % (id, max(bow), len(vocab)))
 
-        if min(bow) < 0:
+        if min(bow_indices) < 0:
             raise ValueError("Document %d has min term index %d, below 0" % (id, min(bow)))
 
         doc = docs_by_id[id]
-        doc.set_bow(bow)
+        doc.set_bow(bow_indices, bow_values)
+
+    documents = docs_by_id.values()
+    print "  Vocab has %d words." % len(vocab)
+    print "  Dataset contains %d documents" % len(documents)
+
+    training = [d for d in documents if d.is_train]
+    validation = [d for d in documents if d.is_validation]
+    test = [d for d in documents if d.is_test]
+
+    print "  Training data contains %d documents" % len(training)
+    print "  Validation data contains %d documents" % len(validation)
+    print "  Test data contains %d documents" % len(test)
+
+    training = convert_to_sklearn(training, vocab)
+    validation = convert_to_sklearn(validation, vocab)
+    test = convert_to_sklearn(test, vocab)
+
+    return training, validation, test
 
 
-    print "Vocab has %d words." % len(vocab)
-    print "Dataset contains %d documents" % len(docs_by_id)
-    
-    return docs_by_id.values(), vocab
+def unsparse(indices, values, length):
+    import numpy as np
+
+    result = np.zeros(length)
+    for i, idx in enumerate(indices):
+        result[idx] = values[i]
+
+    return result
 
 
 def convert_to_sklearn(documents, vocab):
     """Convert a document collection to an sklearn dataset"""
-    
+    from sklearn.datasets.base import Bunch
+    import numpy as np
+
+    n_samples = len(documents)
+    n_features = len(vocab)
+
+    data = np.empty((n_samples, n_features))
+    target = np.empty((n_samples,), dtype=np.int)
+
+    for i, document in enumerate(documents):
+        bowvector = unsparse(document.bow_indices, document.bow_values, n_features)
+        data[i] = np.asarray(bowvector, dtype=np.float)
+        target[i] = np.asarray(document.label, dtype=np.int)
+
+    return Bunch(data=data,
+                 target=target,
+                 feature_names=vocab)
