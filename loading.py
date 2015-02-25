@@ -49,7 +49,7 @@ def load_indices(path_to_dataset):
         for row in reader:
             # First col is id, rest are indices, all ints
             docId = int(row[0])
-            bow = [int(idx) - 1 for idx in row[1:]]
+            bow = [int(idx) for idx in row[1:]]
             yield (docId, bow)
 
 
@@ -136,10 +136,10 @@ def load_dataset(path_to_folder):
 
         if max(bow_indices) >= len(vocab):
             raise ValueError(
-                "Document %d has max term index of %d and vocab only has %d words" % (id, max(bow), len(vocab)))
+                "Document %d has max term index of %d and vocab only has %d words" % (id, max(bow_indices), len(vocab)))
 
         if min(bow_indices) < 0:
-            raise ValueError("Document %d has min term index %d, below 0" % (id, min(bow)))
+            raise ValueError("Document %d has min term index %d, below 0" % (id, min(bow_indices)))
 
         doc = docs_by_id[id]
         doc.set_bow(bow_indices, bow_values)

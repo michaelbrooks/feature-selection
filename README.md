@@ -70,8 +70,6 @@ DocId, Label, IsInTrainingSet, IsInValidationSet, IsInTestSet
 The `Indices.csv` and `Values.csv` files together encodes what features (vocab words)
 exist in which documents, and what their values are.
 
-> The indices refer to words in the vocabulary, but these are expected to be **1-indexed**.
-
 The rows in these two files have variable length, but the first column in each case is the document id.
 The document ids should match row for row between `Indices.csv` and `Values.csv`,
 and the lengths of the rows should also match.

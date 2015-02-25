@@ -1,3 +1,4 @@
+import sys
 from sklearn.cross_validation import KFold
 from sklearn.feature_selection import SelectKBest, VarianceThreshold
 from sklearn.base import BaseEstimator
@@ -67,22 +68,44 @@ def metric_random(X, y):
 
 
 def quick_eval(X, y):
-    kf = KFold(len(X), n_folds=2)
+    kf = KFold(len(X), n_folds=2, shuffle=True)
     acc = 0
+    f1 = 0
+    pr_auc = 0
     denom = 0
     for train, test in kf:
         X_train = X[train]
         y_train = y[train]
         X_test = X[test]
         y_test = y[test]
-        acc += train_test_eval(X_train, y_train, X_test, y_test)
+        _acc, _f1, _pr_auc = train_test_eval(X_train, y_train, X_test, y_test)
+        acc += _acc
+        f1 += _f1
+        pr_auc += _pr_auc
         denom += 1
-    print "Average accuracy over %d folds: %.1f%%" % (denom, 100 * acc / denom)
+    print "Average over %d folds:"
+    print_metrics(acc / denom, f1 / denom, pr_auc / denom)
 
-def train_test_eval(X_train, y_train, X_test, y_test):
-    from sklearn import linear_model
-    clf = linear_model.LogisticRegression(C=1).fit(X_train, y_train)
-    return clf.score(X_test, y_test)
+def train_test_eval(X_train, y_train, X_test, y_test, model='lr'):
+    """Get accuracy, F1, and PR AUC"""
+
+    from sklearn.metrics import f1_score, average_precision_score, accuracy_score
+    
+    if model == 'lr':
+        from sklearn import linear_model
+        model = linear_model.LogisticRegression(C=1)
+    elif model == 'svm':
+        from sklearn import svm
+        model = svm.LinearSVC(C=1)
+        
+    clf = model.fit(X_train, y_train)
+    y_predicted = clf.predict(X_test)
+    y_score = clf.decision_function(X_test)
+    
+    f1 = f1_score(y_test, y_predicted)
+    pr_auc = average_precision_score(y_test, y_score)
+    acc = accuracy_score(y_test, y_predicted)
+    return acc, f1, pr_auc
 
 def print_selected(names, selected):
     print "Features:"
@@ -92,16 +115,34 @@ def print_selected(names, selected):
         else:
             print "   %s" % fname
 
+def list_selected(names, selected, out=sys.stdout):
+    for i, fname in enumerate(names):
+        if i in selected:
+            print >> out, fname
 
-def select_and_eval(features, metric, kfeatures, X_train, y_train, X_test=None, y_test=None):
+def print_metrics(train_acc, train_f1, train_pr_auc, test_acc=None, test_f1=None, test_pr_auc=None):
+    if test_acc is None:
+        print "    Acc: %0.1f%%" % (100*train_acc)
+        print "     F1: %.3f" % train_f1
+        print "AUC(PR): %.3f" % train_pr_auc
+    else:
+        print "         Train   Test"
+        print "    Acc: %0.1f%%  %0.1f%%" % (100*train_acc, 100*test_acc)
+        print "     F1:  %.2f   %.2f" % (train_f1, test_f1)
+        print "AUC(PR):  %.2f   %.2f" % (train_pr_auc, test_pr_auc)
+        
+def select_and_eval(metric, kfeatures, X_train, y_train, X_test=None, y_test=None):
     selector = feature_selector(metric, kfeatures, X_train, y_train)
     selected = get_selected_feature_indices(selector)
     X_selected = filter_features(selector, X_train)
     
-    print_selected(features, selected)
     if X_test is None:
         quick_eval(X_selected, y_train)
     else:
         X_test_selected = filter_features(selector, X_test)
-        acc = train_test_eval(X_selected, y_train, X_test_selected, y_test)
-        print "Accuracy: %.1f%%" % (100 * acc)
+        train_acc, train_f1, train_pr_auc = train_test_eval(X_selected, y_train, X_selected, y_train)
+        test_acc, test_f1, test_pr_auc = train_test_eval(X_selected, y_train, X_test_selected, y_test)
+        print_metrics(train_acc, train_f1, train_pr_auc, test_acc, test_f1, test_pr_auc)
+        
+        
+    return selected
