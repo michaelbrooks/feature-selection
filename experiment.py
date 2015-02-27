@@ -16,6 +16,7 @@ def experiment(dataset_directory):
     metrics = [
         selection.metric_chi2,
         selection.metric_random,
+        selection.metric_infogain
     ]
 
     results = []
